@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>DataTables Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"> 
+  <script src="jquery/jquery-3.7.1.min.js"></script>  
+  <link href="DataTables/datatables.min.css" rel="stylesheet"> 
+  <script src="DataTables/datatables.min.js"></script>
+</head>
+<body>
+<table id="example" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>Name</th><th>Position</th><th>Office</th>
+                <th>Age</th><th>Start date</th><th>Salary</th>
+            </tr>
+        </thead>
+</table>
+<script>
+$('#example').DataTable( {
+    serverSide: true,
+    ajax: {
+        url: 'ajax.txt',
+		type: 'POST'
+    },
+	columns: [
+        { data: 'name' }, { data: 'position' },        
+        { data: 'office' }, { data: 'extn' },
+        { data: 'start_date' }, { data: 'salary' }
+    ]
+} );
+</script>
+</body>
+</html>
