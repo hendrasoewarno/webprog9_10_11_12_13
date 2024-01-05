@@ -1,6 +1,27 @@
 <?php
 include("library.php");
 
+function processBiayaRoom($con, $occupiedId) {
+	$sqlData = "SELECT a.RoomId, a.DariTanggal, a.SampaiTanggal, a.CheckInTime, a.CheckOutTime, a.Rate, a.GroupId FROM occupied a WHERE a.OccupiedId=:OccupiedId And CheckOutTime is not Null";
+	$data=queryArrayValue($con, $sqlData, array("OccupiedId"=>$occupiedId));	
+	$start = $date = new DateTime($data["DariTanggal"]);	
+	$sqlCheck = "SELECT DKId FROM DK Where GroupId=:GroupId and RoomId=:RoomId and Tanggal=:Tanggal and Jenis='Room';";	
+	while ($start <= new DateTime($data["SampaiTanggal"])) {
+		$DKId = querySingleValue($con, $sqlCheck, array("GroupId"=>$data["GroupId"], "RoomId"=>$data["RoomId"], "Tanggal"=>$start->format("Y-m-d")));
+		//Kalau sudah ada
+		if ($DKId) {
+			$sqlUpdateDK = "UPDATE DK Set Amount=:Amount WHERE DKId=:DKId";
+			updateRow($con, $sqlUpdateDK, array("Amount"=>$data["Rate"], "DKId"=>$DKId));			
+		}
+		else {
+			$sqlInsertDK = "INSERT INTO DK (GroupId, RoomId, Tanggal, Jenis, Keterangan, Amount) VALUES(:GroupId, :RoomId, :Tanggal, 'Room', :Keterangan, :Amount);";
+			createRow($con, $sqlInsertDK, array("GroupId"=>$data["GroupId"], "RoomId"=>$data["RoomId"], "Tanggal"=>$start->format("Y-m-d"),
+			"Keterangan"=>"Room Charge " . $data["RoomId"] . "@" . $start->format("Y-m-d"), "Amount"=>$data["Rate"]));			
+		}
+		$start->modify('+1 day');
+	}	
+}
+
 function showUI() {
 ?>
 <!DOCTYPE html>
@@ -44,7 +65,6 @@ function showUI() {
 		<div class="mb-3">
 		   <label for="DariTanggal" class="form-label">Dari Tanggal</label>
 		   <input type="date" class="form-control" id="DariTanggal" placeholder="Isikan Dari Tanggal" name="input-element">
-           </select>
         </div>
 		<div class="mb-3">
 		   <label for="DariTanggal" class="form-label">Sampai Tanggal</label>
@@ -113,7 +133,7 @@ var table = $('#example').DataTable( {
 	columns: [
         { data: 'RoomId' }, { data: 'GuestId' },  { data: 'Nama' },  { data: 'VoucherId' }, { data: 'DariTanggal' },  { data: 'SampaiTanggal' }, { data: 'CheckInTime' }, { data: 'CheckOutTime' }, { data: 'Rate' }, { data: 'GroupId' }, { data: 'OccupiedId' },
 		{ "orderable": false, "data": null,"defaultContent":
-				"<button type=\"button\" class=\"btn btn-warning btn-sm\" id=\"edit\">Edit</button>&nbsp;<button type=\"button\" class=\"btn btn-danger btn-sm\" id=\"delete\">Delete</button>&nbsp;<button type=\"button\" class=\"btn btn-dark btn-sm\" id=\"checkin\">Check-In</button>&nbsp;<button type=\"button\" class=\"btn btn-dark btn-sm\" id=\"checkout\">Check-Out</button>"}
+			"<button type=\"button\" class=\"btn btn-warning btn-sm\" id=\"edit\">Edit</button>&nbsp;<button type=\"button\" class=\"btn btn-danger btn-sm\" id=\"delete\">Delete</button>&nbsp;<button type=\"button\" class=\"btn btn-dark btn-sm\" id=\"checkin\">Check-In</button>&nbsp;<button type=\"button\" class=\"btn btn-dark btn-sm\" id=\"checkout\">Check-Out</button>"}
     ]
 } );
 
@@ -280,7 +300,7 @@ if (isset($_REQUEST["flag"])) {
 			$con = openConnection();
 			$body = file_get_contents('php://input');
 			$data = json_decode($body, true);		
-			$sql = "INSERT into occupied(RoomId, GuestId, VoucherId, DariTanggal, SampaiTanggal, Rate, GroupId, OccupiedId) VALUES (:RoomId, :GuestId, :VoucherId, :DariTanggal, :SampaiTanggal, :Rate, Case When :GroupId='' Then :GuestId else :GroupId end, :OccupiedId);";		
+			$sql = "INSERT into occupied(RoomId, GuestId, VoucherId, DariTanggal, SampaiTanggal, Rate, GroupId, OccupiedId) VALUES (:RoomId, :GuestId, :VoucherId, :DariTanggal, :SampaiTanggal, :Rate, Case When :GroupId='' Then CONCAT(:GuestId, DATE_FORMAT(:DariTanggal, '%y%m')) else :GroupId end, :OccupiedId);";		
 			createRow($con, $sql, $data);
 			$response["status"]=1;
 			$response["message"]="Ok";
@@ -383,10 +403,13 @@ if (isset($_REQUEST["flag"])) {
 		$response=array();
 		try {
 			$con = openConnection();
+			$con->BeginTransaction();
 			$body = file_get_contents('php://input');
 			$data = json_decode($body, true);		
 			$sql = "UPDATE Occupied SET CheckOutTime=now() WHERE CheckInTime is not Null and OccupiedId=:OccupiedId;";		
 			updateRow($con, $sql, array("OccupiedId"=>$data['OccupiedId']));
+			processBiayaRoom($con, $data['OccupiedId']);
+			$con->Commit();
 			$response["status"]=1;
 			$response["message"]="Ok";
 			$response["data"]=$data;
