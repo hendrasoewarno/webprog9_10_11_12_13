@@ -169,7 +169,6 @@ function checkForeignKey($con, $values) {
 	return $ada;
 }
 
-
 if (isset($_REQUEST["flag"])) {
 	if ($_REQUEST["flag"]=="show") {
 		$con = openConnection();

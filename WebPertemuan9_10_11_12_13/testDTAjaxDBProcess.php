@@ -94,7 +94,7 @@ var table = $('#example').DataTable( {
 	columns: [
         { data: 'RoomId' }, { data: 'Lantai' },  { data: 'JenisKamar' },  { data: 'Status' }, { data: 'ReadyTime' },  { data: 'Keterangan' },
 		{ "orderable": false, "data": null,"defaultContent":
-				"<button type=\"button\" class=\"btn btn-warning btn-sm\" id=\"edit\">Edit</button>"}
+				"<button type=\"button\" class=\"btn btn-warning btn-sm\" id=\"edit\">Edit</button>&nbsp;<button type=\"button\" class=\"btn btn-danger btn-sm\" id=\"delete\">Delete</button>&nbsp;<button type=\"button\" class=\"btn btn-dark btn-sm\" id=\"ready\">Ready</button>"}
     ]
 } );
 
@@ -107,6 +107,7 @@ $('#add').click(function() {
 	$('#JenisKamar').val("");
 	$('#Status').val("0");
 	$('#Keterangan').val("");
+	$('#save').text("Save change");
 	$('#feedback').text("");
 	$('#myForm').modal('show');
 });
@@ -167,9 +168,45 @@ table.on('click', '#edit', function (e) {
 		$('#JenisKamar').val(data["JenisKamar"]);
 		$('#Status').val(data["Status"]);
 		$('#Keterangan').val(data["Keterangan"]);		
+		$('#save').text("Save change");
 		$('#feedback').text("");
 		$('#myForm').modal('show');
 	});
+});
+
+//klik pada button delete
+table.on('click', '#delete', function (e) {
+	//ambil data dari baris yang diklik
+    var row = table.row(e.target.closest('tr')).data();
+    var RoomId = row[0];
+	readFromServer({"RoomId":RoomId}, function(data) {
+		flag="delete";
+		$('#myFormTitle').text("Hapus Data");
+		$('#RoomId').val(data["RoomId"]);
+		$('#RoomId').prop( "disabled", true );
+		$('#Lantai').val(data["Lantai"]);
+		$('#JenisKamar').val(data["JenisKamar"]);
+		$('#Status').val(data["Status"]);
+		$('#Keterangan').val(data["Keterangan"]);		
+		$('#save').text("Delete record");
+		$('#feedback').text("");
+		$('#myForm').modal('show');
+	});
+});
+
+//klik pada button ready
+table.on('click', '#ready', function (e) {
+	//ambil data dari baris yang diklik
+    var row = table.row(e.target.closest('tr')).data();
+    var RoomId = row[0];
+	var obj = {"RoomId":RoomId};
+	$.post("?flag=ready", JSON.stringify(obj), 
+	    function(data,status) {
+			if (data["status"]==1) {
+				table.ajax.reload();
+			}
+		}
+	);
 });
 </script>
 </body>
@@ -247,6 +284,48 @@ if (isset($_REQUEST["flag"])) {
 			$data = json_decode($body, true);		
 			$sql = "UPDATE room SET Lantai=:Lantai, JenisKamar=:JenisKamar, Status=:Status, Keterangan=:Keterangan WHERE RoomId=:RoomId;";		
 			updateRow($con, $sql, $data);
+			$response["status"]=1;
+			$response["message"]="Ok";
+			$response["data"]=$data;
+		}
+		catch(Exception $e) {
+			$response["status"]=0;
+			$response["message"]=$e->getMessage();
+			$response["data"]=null;						
+		}
+		
+		header("Content-type: application/json; charset=utf-8");
+		echo json_encode($response);
+	}
+	else if($_REQUEST["flag"]=="delete") {
+		$response=array();
+		try {
+			$con = openConnection();
+			$body = file_get_contents('php://input');
+			$data = json_decode($body, true);		
+			$sql = "DELETE FROM room WHERE RoomId=:RoomId;";		
+			deleteRow($con, $sql, array("RoomId"=>$data['RoomId']));
+			$response["status"]=1;
+			$response["message"]="Ok";
+			$response["data"]=$data;
+		}
+		catch(Exception $e) {
+			$response["status"]=0;
+			$response["message"]=$e->getMessage();
+			$response["data"]=null;						
+		}
+		
+		header("Content-type: application/json; charset=utf-8");
+		echo json_encode($response);
+	}	
+	else if($_REQUEST["flag"]=="ready") {
+		$response=array();
+		try {
+			$con = openConnection();
+			$body = file_get_contents('php://input');
+			$data = json_decode($body, true);		
+			$sql = "UPDATE room SET ReadyTime=now() WHERE RoomId=:RoomId;";		
+			updateRow($con, $sql, array("RoomId"=>$data['RoomId']));
 			$response["status"]=1;
 			$response["message"]="Ok";
 			$response["data"]=$data;
